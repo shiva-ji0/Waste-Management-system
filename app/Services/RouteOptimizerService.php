@@ -4,9 +4,7 @@ namespace App\Services;
 
 class RouteOptimizerService
 {
-    /**
-     * Calculate Haversine distance between two coordinates in kilometers
-     */
+
     public function haversineDistance(float $lat1, float $lon1, float $lat2, float $lon2): float
     {
         $earthRadius = 6371; // Earth's radius in kilometers
@@ -24,29 +22,132 @@ class RouteOptimizerService
     }
 
     /**
-     * Find the nearest unvisited node
-     */
-    private function findMinimumKey(array $key, array $visited): int
-    {
-        $min = PHP_FLOAT_MAX;
-        $minIndex = -1;
-
-        foreach ($key as $index => $value) {
-            if (!$visited[$index] && $value < $min) {
-                $min = $value;
-                $minIndex = $index;
-            }
-        }
-
-        return $minIndex;
-    }
-
-    /**
-     * Build Minimum Spanning Tree using Prim's Algorithm with Haversine distance
+     * Optimize route using Nearest Neighbor Algorithm (Greedy Approach)
+     * Always go to the closest unvisited location next
      * 
      * @param array $pickups Array of pickups with latitude and longitude
      * @param array|null $startPoint Starting point [lat, lon], uses first pickup if null
-     * @return array ['mst' => edges, 'totalDistance' => float, 'route' => ordered points]
+     * @return array ['route' => ordered points, 'totalDistance' => float, 'directions' => array]
+     */
+    public function optimizeRouteNearestNeighbor(array $pickups, ?array $startPoint = null): array
+    {
+        $n = count($pickups);
+        
+        if ($n === 0) {
+            return ['route' => [], 'totalDistance' => 0, 'directions' => [], 'estimatedTime' => '0 minutes'];
+        }
+
+        if ($n === 1) {
+            $distance = 0;
+            if ($startPoint) {
+                $distance = $this->haversineDistance(
+                    $startPoint[0], $startPoint[1],
+                    $pickups[0]['latitude'], $pickups[0]['longitude']
+                );
+            }
+            
+            return [
+                'route' => $startPoint ? [
+                    [
+                        'id' => 'start',
+                        'latitude' => $startPoint[0],
+                        'longitude' => $startPoint[1],
+                        'is_start' => true
+                    ],
+                    $pickups[0]
+                ] : [$pickups[0]],
+                'totalDistance' => round($distance, 2),
+                'directions' => [],
+                'estimatedTime' => $this->estimateTime($distance)
+            ];
+        }
+
+        // Determine starting point
+        if ($startPoint) {
+            $currentLocation = [
+                'id' => 'start',
+                'latitude' => $startPoint[0],
+                'longitude' => $startPoint[1],
+                'is_start' => true
+            ];
+        } else {
+            $currentLocation = $pickups[0];
+            array_shift($pickups);
+        }
+
+        // Initialize route and tracking
+        $route = [$currentLocation];
+        $unvisited = $pickups;
+        $totalDistance = 0;
+        $directions = [];
+
+        // Greedy Nearest Neighbor: Always pick the closest unvisited location
+        while (count($unvisited) > 0) {
+            $nearestIndex = null;
+            $shortestDistance = PHP_FLOAT_MAX;
+
+            // Find the nearest unvisited pickup
+            foreach ($unvisited as $index => $pickup) {
+                $distance = $this->haversineDistance(
+                    $currentLocation['latitude'],
+                    $currentLocation['longitude'],
+                    $pickup['latitude'],
+                    $pickup['longitude']
+                );
+
+                if ($distance < $shortestDistance) {
+                    $shortestDistance = $distance;
+                    $nearestIndex = $index;
+                }
+            }
+
+            // Move to the nearest pickup
+            $nextLocation = $unvisited[$nearestIndex];
+            $route[] = $nextLocation;
+            $totalDistance += $shortestDistance;
+
+            // Add direction
+            $bearing = $this->calculateBearing(
+                $currentLocation['latitude'],
+                $currentLocation['longitude'],
+                $nextLocation['latitude'],
+                $nextLocation['longitude']
+            );
+
+            $directions[] = [
+                'from' => $currentLocation,
+                'to' => $nextLocation,
+                'distance' => round($shortestDistance, 2),
+                'bearing' => $bearing,
+                'direction' => $this->bearingToDirection($bearing),
+                'step' => count($directions) + 1
+            ];
+
+            // Remove visited pickup and update current location
+            unset($unvisited[$nearestIndex]);
+            $unvisited = array_values($unvisited); // Re-index array
+            $currentLocation = $nextLocation;
+        }
+
+        return [
+            'route' => $route,
+            'totalDistance' => round($totalDistance, 2),
+            'directions' => $directions,
+            'estimatedTime' => $this->estimateTime($totalDistance)
+        ];
+    }
+
+    /**
+     * Get optimized route (using Nearest Neighbor by default)
+     */
+    public function getOptimizedRoute(array $pickups, ?array $startPoint = null): array
+    {
+        return $this->optimizeRouteNearestNeighbor($pickups, $startPoint);
+    }
+
+    /**
+     * Build Minimum Spanning Tree using Prim's Algorithm (Alternative method)
+     * Kept for comparison purposes
      */
     public function buildMinimumSpanningTree(array $pickups, ?array $startPoint = null): array
     {
@@ -98,7 +199,6 @@ class RouteOptimizerService
         $key = array_fill(0, $n, PHP_FLOAT_MAX);
         $visited = array_fill(0, $n, false);
 
-        // Start from first node (index 0)
         $key[0] = 0;
         $parent[0] = -1;
 
@@ -143,6 +243,24 @@ class RouteOptimizerService
     }
 
     /**
+     * Find the nearest unvisited node
+     */
+    private function findMinimumKey(array $key, array $visited): int
+    {
+        $min = PHP_FLOAT_MAX;
+        $minIndex = -1;
+
+        foreach ($key as $index => $value) {
+            if (!$visited[$index] && $value < $min) {
+                $min = $value;
+                $minIndex = $index;
+            }
+        }
+
+        return $minIndex;
+    }
+
+    /**
      * Convert MST to ordered route using Depth-First Search
      */
     private function convertMSTToRoute(array $mst, array $pickups, int $startIndex): array
@@ -182,54 +300,6 @@ class RouteOptimizerService
                 $this->dfs($neighbor, $graph, $visited, $route, $pickups);
             }
         }
-    }
-
-    /**
-     * Get optimized route with turn-by-turn directions
-     */
-    public function getOptimizedRoute(array $pickups, ?array $startPoint = null): array
-    {
-        $result = $this->buildMinimumSpanningTree($pickups, $startPoint);
-        
-        // Add turn-by-turn directions
-        $directions = [];
-        $route = $result['route'];
-        
-        for ($i = 0; $i < count($route) - 1; $i++) {
-            $from = $route[$i];
-            $to = $route[$i + 1];
-            
-            $distance = $this->haversineDistance(
-                $from['latitude'],
-                $from['longitude'],
-                $to['latitude'],
-                $to['longitude']
-            );
-            
-            $bearing = $this->calculateBearing(
-                $from['latitude'],
-                $from['longitude'],
-                $to['latitude'],
-                $to['longitude']
-            );
-            
-            $directions[] = [
-                'from' => $from,
-                'to' => $to,
-                'distance' => round($distance, 2),
-                'bearing' => $bearing,
-                'direction' => $this->bearingToDirection($bearing),
-                'step' => $i + 1
-            ];
-        }
-        
-        return [
-            'route' => $route,
-            'mst' => $result['mst'],
-            'totalDistance' => $result['totalDistance'],
-            'directions' => $directions,
-            'estimatedTime' => $this->estimateTime($result['totalDistance'])
-        ];
     }
 
     /**
@@ -276,5 +346,33 @@ class RouteOptimizerService
             $mins = $minutes % 60;
             return $hrs . ' hour' . ($hrs > 1 ? 's' : '') . ($mins > 0 ? ' ' . $mins . ' minutes' : '');
         }
+    }
+
+    /**
+     * Compare different routing algorithms
+     */
+    public function compareAlgorithms(array $pickups, ?array $startPoint = null): array
+    {
+        $nearestNeighbor = $this->optimizeRouteNearestNeighbor($pickups, $startPoint);
+        $mst = $this->buildMinimumSpanningTree($pickups, $startPoint);
+
+        return [
+            'nearest_neighbor' => [
+                'name' => 'Nearest Neighbor (Greedy)',
+                'description' => 'Always go to closest unvisited location',
+                'total_distance' => $nearestNeighbor['totalDistance'],
+                'estimated_time' => $nearestNeighbor['estimatedTime'],
+                'route' => $nearestNeighbor['route']
+            ],
+            'minimum_spanning_tree' => [
+                'name' => 'Minimum Spanning Tree (Prim)',
+                'description' => 'Optimal network connection between all points',
+                'total_distance' => $mst['totalDistance'],
+                'route' => $mst['route']
+            ],
+            'recommendation' => $nearestNeighbor['totalDistance'] <= $mst['totalDistance'] 
+                ? 'nearest_neighbor' 
+                : 'minimum_spanning_tree'
+        ];
     }
 }
