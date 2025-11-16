@@ -231,7 +231,6 @@ class PickupResource extends Resource
             'index' => Pages\ListPickups::route('/'),
             'create' => Pages\CreatePickup::route('/create'),
             'edit' => Pages\EditPickup::route('/{record}/edit'),
-            'map' => Pages\MapView::route('/map'),
         ];
     }
 }

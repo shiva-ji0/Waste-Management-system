@@ -16,4 +16,11 @@ class ListPickups extends ListRecords
             Actions\CreateAction::make(),
         ];
     }
+    
+    protected function getHeaderWidgets(): array
+    {
+        return [
+            PickupResource\Widgets\PickupsMapWidget::class,
+        ];
+    }
 }

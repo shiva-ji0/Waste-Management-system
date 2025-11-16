@@ -37,6 +37,13 @@ class MapView extends Page
             });
     }
 
+    protected function getViewData(): array
+    {
+        return [
+            'pickups' => $this->getPickups(),
+        ];
+    }
+
     protected function getHeaderActions(): array
     {
         return [
