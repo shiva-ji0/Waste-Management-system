@@ -12,7 +12,6 @@ Route::post('/register', [AuthController::class, 'register'])->name('register');
 Route::middleware('auth:sanctum')->group(function () {
    Route::get('/user',[UserContorller::class,'show']);
    Route::get('/wastedetail',[UserContorller::class,'wastes']);
-//    Route::get('/history',[UserContorller::class,'viewhistory'])->name('waste.history');
 
     Route::post('/wastes', [WasteController::class, 'store'])->name('waste.store');
     Route::post('/logout', [AuthController::class, 'logout']);

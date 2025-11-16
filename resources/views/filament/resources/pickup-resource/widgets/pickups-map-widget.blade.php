@@ -9,10 +9,22 @@
                     </svg>
                     <span>Pickup Route Map</span>
                 </div>
-                
+
                 <div class="flex items-center gap-4">
-                    <button 
-                        id="optimize-from-location" 
+                    {{-- NEW: Button to show current location --}}
+                    <button
+                        id="show-my-location"
+                        class="inline-flex items-center gap-2 px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white text-sm font-medium rounded-lg transition-colors duration-150 shadow-sm"
+                    >
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+                        </svg>
+                        <span id="location-btn-text">Show My Location</span>
+                    </button>
+
+                    <button
+                        id="optimize-from-location"
                         class="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors duration-150 shadow-sm"
                     >
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -26,7 +38,6 @@
         </x-slot>
 
         <div class="space-y-4">
-            <!-- Legend -->
             <div class="flex flex-wrap gap-4 items-center">
                 <div class="flex items-center gap-2 text-sm">
                     <div class="w-3 h-3 rounded-full bg-blue-500"></div>
@@ -45,7 +56,6 @@
                 </div>
             </div>
 
-            <!-- Stats (shown after optimization) -->
             <div id="route-stats" style="display: none;" class="grid grid-cols-2 gap-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
                 <div class="flex items-center gap-2">
                     <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -67,10 +77,8 @@
                 </div>
             </div>
 
-            <!-- Map Container -->
             <div id="pickups-map" style="height: 600px; width: 100%; border-radius: 8px;" class="shadow-sm"></div>
-            
-            <!-- Turn-by-turn Directions -->
+
             <div id="directions-container" style="display: none;">
                 <h3 class="text-lg font-semibold mb-3 flex items-center gap-2">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -84,236 +92,294 @@
     </x-filament::section>
 
     @push('styles')
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <style>
-        .custom-marker {
-            background: transparent;
-            border: none;
-        }
-        .leaflet-popup-content-wrapper {
-            border-radius: 8px;
-        }
-        .leaflet-popup-content {
-            margin: 12px;
-        }
-        #optimize-from-location:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-        }
-    </style>
+        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+        <style>
+            .custom-marker {
+                background: transparent;
+                border: none;
+            }
+            .leaflet-popup-content-wrapper {
+                border-radius: 8px;
+            }
+            .leaflet-popup-content {
+                margin: 12px;
+            }
+            #optimize-from-location:disabled,
+            #show-my-location:disabled { /* Added the new button ID */
+                opacity: 0.6;
+                cursor: not-allowed;
+            }
+        </style>
     @endpush
 
     @push('scripts')
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script>
-        let map;
-        let currentLocationMarker;
-        let routeLayer;
-        let markersLayer;
-        
-        document.addEventListener('DOMContentLoaded', function() {
-            map = L.map('pickups-map').setView([27.7172, 85.3240], 12);
+        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+        <script>
+            let map;
+            let currentLocationMarker;
+            let routeLayer;
+            let markersLayer;
 
-            L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                maxZoom: 19,
-                attribution: '© OpenStreetMap contributors'
-            }).addTo(map);
+            document.addEventListener('DOMContentLoaded', function() {
+                map = L.map('pickups-map').setView([27.7172, 85.3240], 12);
 
-            routeLayer = L.layerGroup().addTo(map);
-            markersLayer = L.layerGroup().addTo(map);
+                L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    maxZoom: 19,
+                    attribution: '© OpenStreetMap contributors'
+                }).addTo(map);
 
-            const pickups = @json($this->getPickups());
+                routeLayer = L.layerGroup().addTo(map);
+                markersLayer = L.layerGroup().addTo(map);
 
-            if (pickups.length > 0) {
-                displayPickups(pickups);
-            }
+                const pickups = @json($this->getPickups());
 
-            document.getElementById('optimize-from-location').addEventListener('click', function() {
-                optimizeFromCurrentLocation();
+                if (pickups.length > 0) {
+                    displayPickups(pickups);
+                }
+
+                // Event listeners
+                document.getElementById('optimize-from-location').addEventListener('click', function() {
+                    optimizeFromCurrentLocation();
+                });
+
+                // NEW: Event listener for the new button
+                document.getElementById('show-my-location').addEventListener('click', function() {
+                    showMyLocation();
+                });
             });
-        });
 
-        function optimizeFromCurrentLocation() {
-            const btn = document.getElementById('optimize-from-location');
-            const btnText = document.getElementById('optimize-btn-text');
-            
-            btn.disabled = true;
-            btnText.textContent = 'Getting your location...';
+            // NEW: Reusable function to plot the current location marker
+            function plotCurrentLocation(lat, lon) {
+                if (currentLocationMarker) {
+                    map.removeLayer(currentLocationMarker);
+                }
 
-            if (!navigator.geolocation) {
-                alert('Geolocation is not supported by your browser');
-                btn.disabled = false;
-                btnText.textContent = 'Optimize Route from My Location';
-                return;
+                currentLocationMarker = L.marker([lat, lon], {
+                    icon: L.divIcon({
+                        className: 'custom-marker',
+                        html: `
+                        <div style="
+                            background-color: #10b981;
+                            width: 40px;
+                            height: 40px;
+                            border-radius: 50%;
+                            border: 4px solid white;
+                            box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            animation: pulse 2s infinite;
+                        ">
+                            <div style="font-size: 20px;">📍</div>
+                        </div>
+                        <style>
+                            @keyframes pulse {
+                                0%, 100% { transform: scale(1); }
+                                50% { transform: scale(1.1); }
+                            }
+                        </style>
+                    `,
+                        iconSize: [40, 40],
+                        iconAnchor: [20, 20]
+                    })
+                }).addTo(map);
+
+                currentLocationMarker.bindPopup('<strong>Your Current Location</strong>').openPopup();
+                map.setView([lat, lon], 15); // Zoom in a bit more
             }
 
-            navigator.geolocation.getCurrentPosition(
-                function(position) {
-                    const lat = position.coords.latitude;
-                    const lon = position.coords.longitude;
-                    
-                    btnText.textContent = 'Optimizing route...';
-                    
-                    if (currentLocationMarker) {
-                        map.removeLayer(currentLocationMarker);
+            // NEW: Dedicated function to show only the location
+            function showMyLocation() {
+                const btn = document.getElementById('show-my-location');
+                const btnText = document.getElementById('location-btn-text');
+
+                btn.disabled = true;
+                btnText.textContent = 'Getting location...';
+
+                if (!navigator.geolocation) {
+                    alert('Geolocation is not supported by your browser');
+                    btn.disabled = false;
+                    btnText.textContent = 'Show My Location';
+                    return;
+                }
+
+                navigator.geolocation.getCurrentPosition(
+                    function(position) {
+                        const lat = position.coords.latitude;
+                        const lon = position.coords.longitude;
+
+                        plotCurrentLocation(lat, lon); // Use the reusable plotting function
+
+                        btnText.textContent = '✓ Location Shown!';
+                        setTimeout(() => {
+                            btnText.textContent = 'Show My Location';
+                        }, 3000);
+                        btn.disabled = false;
+                    },
+                    function(error) {
+                        console.error('Geolocation error:', error);
+                        alert('Unable to get your location. Please enable location services.');
+                        btn.disabled = false;
+                        btnText.textContent = 'Show My Location';
+                    },
+                    {
+                        enableHighAccuracy: true,
+                        timeout: 10000,
+                        maximumAge: 0
                     }
-                    
-                    currentLocationMarker = L.marker([lat, lon], {
-                        icon: L.divIcon({
-                            className: 'custom-marker',
-                            html: `
-                                <div style="
-                                    background-color: #10b981;
-                                    width: 40px;
-                                    height: 40px;
-                                    border-radius: 50%;
-                                    border: 4px solid white;
-                                    box-shadow: 0 4px 10px rgba(0,0,0,0.4);
-                                    display: flex;
-                                    align-items: center;
-                                    justify-content: center;
-                                    animation: pulse 2s infinite;
-                                ">
-                                    <div style="font-size: 20px;">📍</div>
-                                </div>
-                                <style>
-                                    @keyframes pulse {
-                                        0%, 100% { transform: scale(1); }
-                                        50% { transform: scale(1.1); }
-                                    }
-                                </style>
-                            `,
-                            iconSize: [40, 40],
-                            iconAnchor: [20, 20]
-                        })
-                    }).addTo(map);
-                    
-                    currentLocationMarker.bindPopup('<strong>Your Current Location</strong>').openPopup();
-                    
-                    fetch('/admin/pickups/optimize-route', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
-                        },
-                        body: JSON.stringify({
-                            start_lat: lat,
-                            start_lon: lon
-                        })
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.success && data.route) {
-                            displayRoute(data.route);
-                            map.setView([lat, lon], 13);
-                            
-                            document.getElementById('route-stats').style.display = 'grid';
-                            document.getElementById('total-distance').textContent = data.route.totalDistance + ' km';
-                            document.getElementById('estimated-time').textContent = data.route.estimatedTime;
-                            
-                            btnText.textContent = '✓ Route Optimized!';
-                            setTimeout(() => {
-                                btnText.textContent = 'Optimize Route from My Location';
-                            }, 3000);
-                        } else {
-                            alert(data.message || 'Could not optimize route');
-                            btnText.textContent = 'Optimize Route from My Location';
-                        }
-                        btn.disabled = false;
-                    })
-                    .catch(error => {
-                        console.error('Error:', error);
-                        alert('Error optimizing route. Please try again.');
-                        btn.disabled = false;
-                        btnText.textContent = 'Optimize Route from My Location';
-                    });
-                },
-                function(error) {
-                    console.error('Geolocation error:', error);
-                    alert('Unable to get your location. Please enable location services.');
+                );
+            }
+
+            // Refactored optimizeFromCurrentLocation to use plotCurrentLocation
+            function optimizeFromCurrentLocation() {
+                const btn = document.getElementById('optimize-from-location');
+                const btnText = document.getElementById('optimize-btn-text');
+
+                btn.disabled = true;
+                btnText.textContent = 'Getting your location...';
+
+                if (!navigator.geolocation) {
+                    alert('Geolocation is not supported by your browser');
                     btn.disabled = false;
                     btnText.textContent = 'Optimize Route from My Location';
-                },
-                {
-                    enableHighAccuracy: true,
-                    timeout: 10000,
-                    maximumAge: 0
+                    return;
                 }
-            );
-        }
 
-        function displayPickups(pickups) {
-            markersLayer.clearLayers();
-            
-            pickups.forEach((pickup, index) => {
-                const marker = L.marker([pickup.latitude, pickup.longitude], {
-                    icon: createCustomIcon('pending', pickup.waste_type)
-                }).addTo(markersLayer);
-                
-                marker.bindPopup(createPickupPopup(pickup, index + 1, 0));
-            });
-            
-            if (pickups.length > 0) {
-                const bounds = L.latLngBounds(pickups.map(p => [p.latitude, p.longitude]));
-                map.fitBounds(bounds, { padding: [50, 50] });
+                navigator.geolocation.getCurrentPosition(
+                    function(position) {
+                        const lat = position.coords.latitude;
+                        const lon = position.coords.longitude;
+
+                        // Plot the location marker
+                        plotCurrentLocation(lat, lon);
+
+                        btnText.textContent = 'Optimizing route...';
+
+                        fetch('/admin/pickups/optimize-route', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                            },
+                            body: JSON.stringify({
+                                start_lat: lat,
+                                start_lon: lon
+                            })
+                        })
+                            .then(response => response.json())
+                            .then(data => {
+                                if (data.success && data.route) {
+                                    displayRoute(data.route);
+
+                                    document.getElementById('route-stats').style.display = 'grid';
+                                    document.getElementById('total-distance').textContent = data.route.totalDistance + ' km';
+                                    document.getElementById('estimated-time').textContent = data.route.estimatedTime;
+
+                                    btnText.textContent = '✓ Route Optimized!';
+                                    setTimeout(() => {
+                                        btnText.textContent = 'Optimize Route from My Location';
+                                    }, 3000);
+                                } else {
+                                    alert(data.message || 'Could not optimize route');
+                                    btnText.textContent = 'Optimize Route from My Location';
+                                }
+                                btn.disabled = false;
+                            })
+                            .catch(error => {
+                                console.error('Error:', error);
+                                alert('Error optimizing route. Please try again.');
+                                btn.disabled = false;
+                                btnText.textContent = 'Optimize Route from My Location';
+                            });
+                    },
+                    function(error) {
+                        console.error('Geolocation error:', error);
+                        alert('Unable to get your location. Please enable location services.');
+                        btn.disabled = false;
+                        btnText.textContent = 'Optimize Route from My Location';
+                    },
+                    {
+                        enableHighAccuracy: true,
+                        timeout: 10000,
+                        maximumAge: 0
+                    }
+                );
             }
-        }
 
-        function displayRoute(optimizedRoute) {
-            routeLayer.clearLayers();
-            markersLayer.clearLayers();
-            
-            const route = optimizedRoute.route;
-            
-            if (!route || route.length === 0) return;
+            // Remaining functions (displayPickups, displayRoute, displayDirections, createPickupPopup, getWasteTypeIcon, createCustomIcon, createNumberedIcon) are unchanged...
 
-            const routeCoordinates = route.map(point => [point.latitude, point.longitude]);
-            
-            const routeLine = L.polyline(routeCoordinates, {
-                color: '#3b82f6',
-                weight: 4,
-                opacity: 0.7,
-                smoothFactor: 1
-            }).addTo(routeLayer);
+            function displayPickups(pickups) {
+                markersLayer.clearLayers();
 
-            route.forEach((point, index) => {
-                let markerColor, markerIcon;
-                
-                if (index === 0) {
-                    markerColor = '#22c55e';
-                    markerIcon = '🏁';
-                } else if (index === route.length - 1) {
-                    markerColor = '#ef4444';
-                    markerIcon = '🏁';
-                } else {
-                    markerColor = '#3b82f6';
-                    markerIcon = getWasteTypeIcon(point.waste_type);
+                pickups.forEach((pickup, index) => {
+                    const marker = L.marker([pickup.latitude, pickup.longitude], {
+                        icon: createCustomIcon('pending', pickup.waste_type)
+                    }).addTo(markersLayer);
+
+                    marker.bindPopup(createPickupPopup(pickup, index + 1, 0));
+                });
+
+                if (pickups.length > 0) {
+                    const bounds = L.latLngBounds(pickups.map(p => [p.latitude, p.longitude]));
+                    map.fitBounds(bounds, { padding: [50, 50] });
                 }
+            }
 
-                const customIcon = createNumberedIcon(index + 1, markerColor, markerIcon);
-                
-                const marker = L.marker([point.latitude, point.longitude], {
-                    icon: customIcon
-                }).addTo(markersLayer);
+            function displayRoute(optimizedRoute) {
+                routeLayer.clearLayers();
+                markersLayer.clearLayers();
 
-                const distance = index > 0 && optimizedRoute.directions[index - 1] 
-                    ? optimizedRoute.directions[index - 1].distance 
-                    : 0;
-                
-                marker.bindPopup(createPickupPopup(point, index + 1, distance));
-            });
+                const route = optimizedRoute.route;
 
-            if (optimizedRoute.directions) {
-                optimizedRoute.directions.forEach((direction) => {
-                    const midPoint = [
-                        (direction.from.latitude + direction.to.latitude) / 2,
-                        (direction.from.longitude + direction.to.longitude) / 2
-                    ];
-                    
-                    L.marker(midPoint, {
-                        icon: L.divIcon({
-                            className: 'distance-label',
-                            html: `<div style="
+                if (!route || route.length === 0) return;
+
+                const routeCoordinates = route.map(point => [point.latitude, point.longitude]);
+
+                const routeLine = L.polyline(routeCoordinates, {
+                    color: '#3b82f6',
+                    weight: 4,
+                    opacity: 0.7,
+                    smoothFactor: 1
+                }).addTo(routeLayer);
+
+                route.forEach((point, index) => {
+                    let markerColor, markerIcon;
+
+                    if (index === 0) {
+                        markerColor = '#22c55e';
+                        markerIcon = '🏁';
+                    } else if (index === route.length - 1) {
+                        markerColor = '#ef4444';
+                        markerIcon = '🏁';
+                    } else {
+                        markerColor = '#3b82f6';
+                        markerIcon = getWasteTypeIcon(point.waste_type);
+                    }
+
+                    const customIcon = createNumberedIcon(index + 1, markerColor, markerIcon);
+
+                    const marker = L.marker([point.latitude, point.longitude], {
+                        icon: customIcon
+                    }).addTo(markersLayer);
+
+                    const distance = index > 0 && optimizedRoute.directions[index - 1]
+                        ? optimizedRoute.directions[index - 1].distance
+                        : 0;
+
+                    marker.bindPopup(createPickupPopup(point, index + 1, distance));
+                });
+
+                if (optimizedRoute.directions) {
+                    optimizedRoute.directions.forEach((direction) => {
+                        const midPoint = [
+                            (direction.from.latitude + direction.to.latitude) / 2,
+                            (direction.from.longitude + direction.to.longitude) / 2
+                        ];
+
+                        L.marker(midPoint, {
+                            icon: L.divIcon({
+                                className: 'distance-label',
+                                html: `<div style="
                                 background: white;
                                 padding: 2px 6px;
                                 border-radius: 4px;
@@ -323,27 +389,27 @@
                                 border: 1px solid #3b82f6;
                                 white-space: nowrap;
                             ">${direction.distance} km</div>`,
-                            iconSize: [0, 0]
-                        })
-                    }).addTo(routeLayer);
-                });
-                
-                displayDirections(optimizedRoute.directions);
+                                iconSize: [0, 0]
+                            })
+                        }).addTo(routeLayer);
+                    });
+
+                    displayDirections(optimizedRoute.directions);
+                }
+
+                map.fitBounds(routeLine.getBounds(), { padding: [50, 50] });
             }
 
-            map.fitBounds(routeLine.getBounds(), { padding: [50, 50] });
-        }
+            function displayDirections(directions) {
+                const container = document.getElementById('directions-container');
+                const list = document.getElementById('directions-list');
 
-        function displayDirections(directions) {
-            const container = document.getElementById('directions-container');
-            const list = document.getElementById('directions-list');
-            
-            list.innerHTML = '';
-            
-            directions.forEach(direction => {
-                const div = document.createElement('div');
-                div.className = 'flex items-start gap-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg';
-                div.innerHTML = `
+                list.innerHTML = '';
+
+                directions.forEach(direction => {
+                    const div = document.createElement('div');
+                    div.className = 'flex items-start gap-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg';
+                    div.innerHTML = `
                     <div class="flex-shrink-0 w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center font-bold text-sm">
                         ${direction.step}
                     </div>
@@ -358,17 +424,17 @@
                         ` : ''}
                     </div>
                 `;
-                list.appendChild(div);
-            });
-            
-            container.style.display = 'block';
-        }
+                    list.appendChild(div);
+                });
 
-        function createPickupPopup(point, step, distance) {
-            const isStart = step === 1;
-            const statusColor = isStart ? '#22c55e' : '#3b82f6';
-            
-            return `
+                container.style.display = 'block';
+            }
+
+            function createPickupPopup(point, step, distance) {
+                const isStart = step === 1;
+                const statusColor = isStart ? '#22c55e' : '#3b82f6';
+
+                return `
                 <div style="min-width: 220px;">
                     <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
                         <h3 style="font-weight: 600; margin: 0;">Stop #${step}</h3>
@@ -386,44 +452,44 @@
                     ` : '<p>Your current location</p>'}
                 </div>
             `;
-        }
+            }
 
-        function getWasteTypeIcon(wasteType) {
-            const icons = {
-                'organic': '🌿',
-                'recyclable': '♻️',
-                'hazardous': '☢️',
-                'electronic': '🔌',
-                'general': '🗑️'
-            };
-            return icons[wasteType] || '📦';
-        }
+            function getWasteTypeIcon(wasteType) {
+                const icons = {
+                    'organic': '🌿',
+                    'recyclable': '♻️',
+                    'hazardous': '☢️',
+                    'electronic': '🔌',
+                    'general': '🗑️'
+                };
+                return icons[wasteType] || '📦';
+            }
 
-        function createCustomIcon(status, wasteType) {
-            const color = '#eab308';
-            const icon = getWasteTypeIcon(wasteType);
-            
-            return L.divIcon({
-                className: 'custom-marker',
-                html: `<div style="background: ${color}; width: 32px; height: 32px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); border: 3px solid white; box-shadow: 0 3px 8px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center;"><div style="transform: rotate(45deg); font-size: 16px;">${icon}</div></div>`,
-                iconSize: [32, 32],
-                iconAnchor: [16, 32]
-            });
-        }
+            function createCustomIcon(status, wasteType) {
+                const color = '#eab308';
+                const icon = getWasteTypeIcon(wasteType);
 
-        function createNumberedIcon(number, color, emoji) {
-            return L.divIcon({
-                className: 'custom-marker',
-                html: `
+                return L.divIcon({
+                    className: 'custom-marker',
+                    html: `<div style="background: ${color}; width: 32px; height: 32px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); border: 3px solid white; box-shadow: 0 3px 8px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center;"><div style="transform: rotate(45deg); font-size: 16px;">${icon}</div></div>`,
+                    iconSize: [32, 32],
+                    iconAnchor: [16, 32]
+                });
+            }
+
+            function createNumberedIcon(number, color, emoji) {
+                return L.divIcon({
+                    className: 'custom-marker',
+                    html: `
                     <div style="position: relative;">
                         <div style="background: ${color}; width: 36px; height: 36px; border-radius: 50%; border: 3px solid white; box-shadow: 0 3px 8px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; font-size: 18px;">${emoji}</div>
                         <div style="position: absolute; bottom: -8px; right: -8px; background: white; color: ${color}; width: 20px; height: 20px; border-radius: 50%; border: 2px solid ${color}; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: bold;">${number}</div>
                     </div>
                 `,
-                iconSize: [36, 36],
-                iconAnchor: [18, 18]
-            });
-        }
-    </script>
+                    iconSize: [36, 36],
+                    iconAnchor: [18, 18]
+                });
+            }
+        </script>
     @endpush
 </x-filament-widgets::widget>

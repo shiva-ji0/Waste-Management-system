@@ -1,16 +1,26 @@
 <?php
 
-// routes/web.php
-
 use App\Http\Controllers\RouteOptimizationController;
 use Illuminate\Support\Facades\Route;
 
+/*
+|--------------------------------------------------------------------------
+| Web Routes
+|--------------------------------------------------------------------------
+*/
 
-// Route optimization routes (protected by auth middleware)
-Route::middleware(['auth'])->prefix('admin/pickups')->name('admin.pickups.')->group(function () {
+Route::get('/', function () {
+    return view('welcome');
+});
+
+// Route Optimization Routes (Protected by Filament Auth)
+Route::middleware(['web', 'auth'])->prefix('admin/pickups')->group(function () {
     Route::post('/optimize-route', [RouteOptimizationController::class, 'optimizeFromLocation'])
-        ->name('optimize-route');
+        ->name('pickups.optimize-route');
     
     Route::get('/pending', [RouteOptimizationController::class, 'getPendingPickups'])
-        ->name('pending');
+        ->name('pickups.pending');
+    
+    Route::post('/calculate-distance', [RouteOptimizationController::class, 'calculateDistance'])
+        ->name('pickups.calculate-distance');
 });

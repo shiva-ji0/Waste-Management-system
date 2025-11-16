@@ -60,7 +60,10 @@ class PickupResource extends Resource
                 Forms\Components\Select::make('status')
                     ->options([
                         'pending' => 'Pending',
+                        'accepted' => 'Accepted',
+                        're-scheduled' => 'Re-scheduled',
                         'collected' => 'Collected',
+                        'completed' => 'Completed',
                         'cancelled' => 'Cancelled',
                     ])
                     ->default('pending')
@@ -69,7 +72,7 @@ class PickupResource extends Resource
                 Map::make('location')
                     ->label('Pickup Location')
                     ->columnSpanFull()
-                    ->defaultLocation(latitude: 27.7172, longitude: 85.3240) // Kathmandu default
+                    ->defaultLocation(latitude: 27.7172, longitude: 85.3240)
                     ->afterStateUpdated(function (callable $set, ?array $state): void {
                         $set('latitude', $state['lat']);
                         $set('longitude', $state['lng']);
@@ -113,6 +116,23 @@ class PickupResource extends Resource
     {
         return $table
             ->columns([
+                Tables\Columns\TextColumn::make('route_sequence')
+                    ->label('#')
+                    ->state(fn ($record) => $record->route_sequence ?? '-')
+                    ->badge()
+                    ->color('success')
+                    ->sortable()
+                    ->visible(fn($livewire) => isset($livewire->sortedRoute) && $livewire->sortedRoute !== null),
+
+                Tables\Columns\TextColumn::make('calculated_distance')
+                    ->label('Distance (from Start)')
+                    ->state(fn ($record) => $record->calculated_distance ?? null)
+                    ->formatStateUsing(fn($state) => $state ? number_format($state, 2) . ' km' : '-')
+                    ->sortable()
+                    ->badge()
+                    ->color('info')
+                    ->visible(fn($livewire) => isset($livewire->startLocation) && $livewire->startLocation !== null),
+
                 Tables\Columns\TextColumn::make('user.name')
                     ->searchable()
                     ->sortable(),
@@ -143,7 +163,10 @@ class PickupResource extends Resource
                     ->badge()
                     ->color(fn (string $state): string => match ($state) {
                         'pending' => 'warning',
+                        'accepted' => 'info',
+                        're-scheduled' => 'purple',
                         'collected' => 'success',
+                        'completed' => 'success',
                         'cancelled' => 'danger',
                         default => 'gray',
                     }),
@@ -166,7 +189,10 @@ class PickupResource extends Resource
                 Tables\Filters\SelectFilter::make('status')
                     ->options([
                         'pending' => 'Pending',
+                        'accepted' => 'Accepted',
+                        're-scheduled' => 'Re-scheduled',
                         'collected' => 'Collected',
+                        'completed' => 'Completed',
                         'cancelled' => 'Cancelled',
                     ]),
 
@@ -195,13 +221,22 @@ class PickupResource extends Resource
                 Tables\Actions\EditAction::make(),
                 Tables\Actions\DeleteAction::make(),
 
-                Tables\Actions\Action::make('viewOnMap')
-                    ->label('View on Map')
-                    ->icon('heroicon-o-map')
-                    ->url(fn ($record) =>
-                    "https://www.google.com/maps?q={$record->latitude},{$record->longitude}"
-                    )
-                    ->openUrlInNewTab(),
+                Tables\Actions\Action::make('markAsCompleted')
+                    ->label('Mark Completed')
+                    ->icon('heroicon-o-check-circle')
+                    ->color('success')
+                    ->requiresConfirmation()
+                    ->action(function ($record) {
+                        $record->update(['status' => 'completed']);
+                    })
+                    ->visible(fn ($record) => in_array($record->status, ['pending', 'accepted', 're-scheduled', 'collected']))
+                    ->successNotification(
+                        \Filament\Notifications\Notification::make()
+                            ->success()
+                            ->title('Pickup Completed')
+                            ->body('The pickup has been marked as completed.')
+                    ),
+
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
@@ -210,8 +245,25 @@ class PickupResource extends Resource
                     Tables\Actions\BulkAction::make('markAsCollected')
                         ->label('Mark as Collected')
                         ->icon('heroicon-o-check-circle')
+                        ->color('success')
                         ->requiresConfirmation()
                         ->action(fn ($records) => $records->each->update(['status' => 'collected']))
+                        ->deselectRecordsAfterCompletion(),
+
+                    Tables\Actions\BulkAction::make('markAsCompleted')
+                        ->label('Mark as Completed')
+                        ->icon('heroicon-o-check-badge')
+                        ->color('success')
+                        ->requiresConfirmation()
+                        ->action(fn ($records) => $records->each->update(['status' => 'completed']))
+                        ->deselectRecordsAfterCompletion(),
+
+                    Tables\Actions\BulkAction::make('markAsAccepted')
+                        ->label('Mark as Accepted')
+                        ->icon('heroicon-o-check')
+                        ->color('info')
+                        ->requiresConfirmation()
+                        ->action(fn ($records) => $records->each->update(['status' => 'accepted']))
                         ->deselectRecordsAfterCompletion(),
                 ]),
             ])
