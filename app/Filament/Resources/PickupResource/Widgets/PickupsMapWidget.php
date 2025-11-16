@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\PickupResource\Widgets;
 
 use App\Models\Waste;
+use App\Services\RouteOptimizerService;
 use Filament\Widgets\Widget;
 
 class PickupsMapWidget extends Widget
@@ -13,7 +14,6 @@ class PickupsMapWidget extends Widget
     
     protected static ?int $sort = -1;
     
-    // Add these properties to fix the error
     protected static bool $isLazy = false;
     
     public static function canView(): bool
@@ -25,6 +25,7 @@ class PickupsMapWidget extends Widget
     {
         return Waste::whereNotNull('latitude')
             ->whereNotNull('longitude')
+            ->where('status', 'pending') // Only show pending pickups for route optimization
             ->with('user')
             ->get()
             ->map(function ($waste) {
@@ -40,5 +41,22 @@ class PickupsMapWidget extends Widget
                     'shift' => $waste->shift,
                 ];
             })->toArray();
+    }
+
+    public function getOptimizedRoute()
+    {
+        $pickups = $this->getPickups();
+        
+        if (count($pickups) < 2) {
+            return null;
+        }
+
+        $optimizer = new RouteOptimizerService();
+        
+        // You can set a starting point (e.g., depot location)
+        // $startPoint = [27.7172, 85.3240]; // Kathmandu center
+        // return $optimizer->getOptimizedRoute($pickups, $startPoint);
+        
+        return $optimizer->getOptimizedRoute($pickups);
     }
 }
