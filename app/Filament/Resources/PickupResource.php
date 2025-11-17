@@ -27,8 +27,7 @@ class PickupResource extends Resource
             ->schema([
                 Forms\Components\Select::make('user_id')
                     ->relationship('user', 'name')
-                    ->required()
-                    ->searchable(),
+                    ->required(),
 
                 Forms\Components\Select::make('waste_type')
                     ->options([

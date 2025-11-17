@@ -93,6 +93,7 @@
 
     @push('styles')
         <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+        <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
         <style>
             .custom-marker {
                 background: transparent;
@@ -109,16 +110,22 @@
                 opacity: 0.6;
                 cursor: not-allowed;
             }
+            /* Hide the default routing control */
+            .leaflet-routing-container {
+                display: none;
+            }
         </style>
     @endpush
 
     @push('scripts')
         <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+        <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
         <script>
             let map;
             let currentLocationMarker;
             let routeLayer;
             let markersLayer;
+            let routingControl;
 
             document.addEventListener('DOMContentLoaded', function() {
                 map = L.map('pickups-map').setView([27.7172, 85.3240], 12);
@@ -131,7 +138,6 @@
                 routeLayer = L.layerGroup().addTo(map);
                 markersLayer = L.layerGroup().addTo(map);
 
-                // Get only accepted and re-scheduled pickups
                 const pickups = @json($this->getPickups());
 
                 console.log('Loaded pickups:', pickups);
@@ -140,7 +146,6 @@
                 if (pickups.length > 0) {
                     displayPickups(pickups);
                 } else {
-                    // Show message when no pickups are available
                     const messageDiv = document.createElement('div');
                     messageDiv.className = 'absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg text-center z-[1000]';
                     messageDiv.innerHTML = `
@@ -154,7 +159,6 @@
                     document.getElementById('pickups-map').appendChild(messageDiv);
                 }
 
-                // Event listeners
                 document.getElementById('optimize-from-location').addEventListener('click', function() {
                     if (pickups.length === 0) {
                         alert('No accepted or re-scheduled pickups available to optimize.');
@@ -287,7 +291,7 @@
                                 console.log('Optimization response:', data);
 
                                 if (data.success && data.route) {
-                                    displayRoute(data.route);
+                                    displayRouteWithRoads(data.route);
 
                                     document.getElementById('route-stats').style.display = 'grid';
                                     document.getElementById('total-distance').textContent = data.route.totalDistance + ' km';
@@ -328,7 +332,6 @@
                 markersLayer.clearLayers();
 
                 pickups.forEach((pickup, index) => {
-                    // Use different colors based on status
                     const statusColor = pickup.status === 're-scheduled' ? '#f59e0b' : '#3b82f6';
 
                     const marker = L.marker([pickup.latitude, pickup.longitude], {
@@ -344,7 +347,12 @@
                 }
             }
 
-            function displayRoute(optimizedRoute) {
+            async function displayRouteWithRoads(optimizedRoute) {
+                // Remove previous routing control
+                if (routingControl) {
+                    map.removeControl(routingControl);
+                }
+
                 routeLayer.clearLayers();
                 markersLayer.clearLayers();
 
@@ -352,15 +360,33 @@
 
                 if (!route || route.length === 0) return;
 
-                const routeCoordinates = route.map(point => [point.latitude, point.longitude]);
+                // Create waypoints for routing
+                const waypoints = route.map(point =>
+                    L.latLng(point.latitude, point.longitude)
+                );
 
-                const routeLine = L.polyline(routeCoordinates, {
-                    color: '#3b82f6',
-                    weight: 4,
-                    opacity: 0.7,
-                    smoothFactor: 1
-                }).addTo(routeLayer);
+                // Create routing control with OSRM (free routing service)
+                routingControl = L.Routing.control({
+                    waypoints: waypoints,
+                    router: L.Routing.osrmv1({
+                        serviceUrl: 'https://router.project-osrm.org/route/v1'
+                    }),
+                    lineOptions: {
+                        styles: [{
+                            color: '#3b82f6',
+                            opacity: 0.8,
+                            weight: 5
+                        }],
+                        addWaypoints: false
+                    },
+                    createMarker: function() { return null; }, // Don't create default markers
+                    routeWhileDragging: false,
+                    showAlternatives: false,
+                    fitSelectedRoutes: true,
+                    show: false // Hide the instruction panel
+                }).addTo(map);
 
+                // Add custom markers
                 route.forEach((point, index) => {
                     let markerColor, markerIcon;
 
@@ -388,35 +414,19 @@
                     marker.bindPopup(createPickupPopup(point, index + 1, distance));
                 });
 
+                // Display turn-by-turn directions
                 if (optimizedRoute.directions) {
-                    optimizedRoute.directions.forEach((direction) => {
-                        const midPoint = [
-                            (direction.from.latitude + direction.to.latitude) / 2,
-                            (direction.from.longitude + direction.to.longitude) / 2
-                        ];
-
-                        L.marker(midPoint, {
-                            icon: L.divIcon({
-                                className: 'distance-label',
-                                html: `<div style="
-                                background: white;
-                                padding: 2px 6px;
-                                border-radius: 4px;
-                                font-size: 10px;
-                                font-weight: bold;
-                                color: #3b82f6;
-                                border: 1px solid #3b82f6;
-                                white-space: nowrap;
-                            ">${direction.distance} km</div>`,
-                                iconSize: [0, 0]
-                            })
-                        }).addTo(routeLayer);
-                    });
-
                     displayDirections(optimizedRoute.directions);
                 }
 
-                map.fitBounds(routeLine.getBounds(), { padding: [50, 50] });
+                // Listen to routing events to get detailed instructions
+                routingControl.on('routesfound', function(e) {
+                    const routes = e.routes;
+                    if (routes && routes[0]) {
+                        console.log('Route instructions:', routes[0].instructions);
+                        // You can enhance the directions display with these instructions
+                    }
+                });
             }
 
             function displayDirections(directions) {
