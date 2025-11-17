@@ -28,7 +28,7 @@ class PickupsMapWidget extends Widget
     {
         return Waste::whereNotNull('latitude')
             ->whereNotNull('longitude')
-            ->whereIn('status', ['accepted', 're-scheduled']) // ONLY accepted and re-scheduled
+            ->whereIn('status', ['accepted', 're-scheduled'])
             ->with('user')
             ->get()
             ->map(function ($waste) {

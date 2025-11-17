@@ -102,19 +102,22 @@ class PickupResource extends Resource
 
                 Forms\Components\TextInput::make('latitude')
                     ->numeric()
-                    ->readOnly()
-                    ->dehydrated(),
+                    ->readOnly(),
 
                 Forms\Components\TextInput::make('longitude')
                     ->numeric()
-                    ->readOnly()
-                    ->dehydrated(),
+                    ->readOnly(),
             ]);
     }
 
     public static function table(Table $table): Table
     {
         return $table
+            /**
+             * HIDE ALL PENDING PICKUPS
+             */
+            ->modifyQueryUsing(fn ($query) => $query->where('status', '!=', 'pending'))
+
             ->columns([
                 Tables\Columns\TextColumn::make('route_sequence')
                     ->label('#')
@@ -188,7 +191,6 @@ class PickupResource extends Resource
             ->filters([
                 Tables\Filters\SelectFilter::make('status')
                     ->options([
-                        'pending' => 'Pending',
                         'accepted' => 'Accepted',
                         're-scheduled' => 'Re-scheduled',
                         'collected' => 'Collected',
@@ -229,14 +231,15 @@ class PickupResource extends Resource
                     ->action(function ($record) {
                         $record->update(['status' => 'completed']);
                     })
-                    ->visible(fn ($record) => in_array($record->status, ['pending', 'accepted', 're-scheduled', 'collected']))
+                    ->visible(fn ($record) =>
+                    in_array($record->status, ['accepted', 're-scheduled', 'collected'])
+                    )
                     ->successNotification(
                         \Filament\Notifications\Notification::make()
                             ->success()
                             ->title('Pickup Completed')
                             ->body('The pickup has been marked as completed.')
                     ),
-
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([

@@ -24,6 +24,9 @@ class ListPickups extends ListRecords
         ];
     }
 
+    /**
+     * Only accepted and re-scheduled pickups (NEVER pending)
+     */
     public function getPickups(): array
     {
         return \App\Models\Waste::query()
