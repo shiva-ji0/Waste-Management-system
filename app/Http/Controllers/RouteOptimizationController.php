@@ -13,7 +13,10 @@ class RouteOptimizationController extends Controller
         private RouteOptimizerService $optimizer
     ) {}
 
-
+    /**
+     * Optimize route from a start location.
+     * Only consider wastes with status 'accepted' or 're-scheduled'.
+     */
     public function optimizeFromLocation(Request $request): JsonResponse
     {
         $validated = $request->validate([
@@ -23,10 +26,10 @@ class RouteOptimizationController extends Controller
             'date' => 'nullable|date',
         ]);
 
-        // Query pickups with multiple statuses
+        // Only accept accepted and re-scheduled wastes (no 'pending')
         $query = Waste::whereNotNull('latitude')
             ->whereNotNull('longitude')
-            ->whereIn('status', ['pending', 're-scheduled', 'accepted'])
+            ->whereIn('status', ['accepted', 're-scheduled'])
             ->with('user');
 
         if (isset($validated['shift'])) {
@@ -38,10 +41,10 @@ class RouteOptimizationController extends Controller
         }
 
         $pickups = $query->get()->map(function ($waste) use ($validated) {
-            // Calculate distance from start point
+            // Calculate distance from start point (cast coords to float)
             $distance = $this->optimizer->haversineDistance(
-                $validated['start_lat'],
-                $validated['start_lon'],
+                (float) $validated['start_lat'],
+                (float) $validated['start_lon'],
                 (float) $waste->latitude,
                 (float) $waste->longitude
             );
@@ -63,27 +66,27 @@ class RouteOptimizationController extends Controller
         if (count($pickups) < 1) {
             return response()->json([
                 'success' => false,
-                'message' => 'No pending, re-scheduled, or accepted pickups found',
+                'message' => 'No accepted or re-scheduled pickups found',
                 'route' => null
             ], 200);
         }
 
-        $startPoint = [$validated['start_lat'], $validated['start_lon']];
+        $startPoint = [(float)$validated['start_lat'], (float)$validated['start_lon']];
 
         try {
             $optimizedRoute = $this->optimizer->getOptimizedRoute($pickups, $startPoint);
 
-            // Add distance information to each pickup in the route
+            // Add distance_from_start for route points that don't have it
             foreach ($optimizedRoute['route'] as &$point) {
                 if (isset($point['distance_from_start'])) {
-                    continue; // Already has distance
+                    continue;
                 }
-                if ($point['id'] !== 'start') {
+                if (($point['id'] ?? null) !== 'start') {
                     $point['distance_from_start'] = round($this->optimizer->haversineDistance(
-                        $validated['start_lat'],
-                        $validated['start_lon'],
-                        $point['latitude'],
-                        $point['longitude']
+                        $startPoint[0],
+                        $startPoint[1],
+                        (float)$point['latitude'],
+                        (float)$point['longitude']
                     ), 2);
                 }
             }
@@ -93,8 +96,8 @@ class RouteOptimizationController extends Controller
                 'message' => 'Route optimized successfully',
                 'route' => $optimizedRoute,
                 'start_location' => [
-                    'latitude' => $validated['start_lat'],
-                    'longitude' => $validated['start_lon']
+                    'latitude' => $startPoint[0],
+                    'longitude' => $startPoint[1]
                 ]
             ]);
         } catch (\Exception $e) {
@@ -107,13 +110,15 @@ class RouteOptimizationController extends Controller
     }
 
     /**
-     * Get pending pickups with optional filters
+     * Get pending pickups with optional filters.
+     * Note: "pending" is intentionally excluded from the returned set per requirement;
+     * only 'accepted' and 're-scheduled' records are returned.
      */
-    public function getPendingPickups(Request $request): JsonResponse
+    public function getPickups(Request $request): JsonResponse
     {
         $query = Waste::whereNotNull('latitude')
             ->whereNotNull('longitude')
-            ->whereIn('status', ['pending', 're-scheduled', 'accepted'])
+            ->whereIn('status', ['accepted', 're-scheduled'])
             ->with('user');
 
         if ($request->has('shift')) {
@@ -141,8 +146,8 @@ class RouteOptimizationController extends Controller
                 'shift' => $waste->shift,
             ];
 
-            // Add distance if start location provided
-            if ($startLat && $startLon) {
+            // Add distance if start location provided and valid
+            if ($startLat !== null && $startLon !== null) {
                 $data['distance'] = round($this->optimizer->haversineDistance(
                     (float) $startLat,
                     (float) $startLon,
@@ -155,7 +160,7 @@ class RouteOptimizationController extends Controller
         });
 
         // Sort by distance if available
-        if ($startLat && $startLon) {
+        if ($startLat !== null && $startLon !== null) {
             $pickups = $pickups->sortBy('distance')->values();
         }
 
@@ -165,7 +170,6 @@ class RouteOptimizationController extends Controller
             'total' => $pickups->count()
         ]);
     }
-
 
     public function calculateDistance(Request $request): JsonResponse
     {
@@ -177,10 +181,10 @@ class RouteOptimizationController extends Controller
         ]);
 
         $distance = $this->optimizer->haversineDistance(
-            $validated['lat1'],
-            $validated['lon1'],
-            $validated['lat2'],
-            $validated['lon2']
+            (float) $validated['lat1'],
+            (float) $validated['lon1'],
+            (float) $validated['lat2'],
+            (float) $validated['lon2']
         );
 
         return response()->json([

@@ -17,10 +17,10 @@ Route::get('/', function () {
 Route::middleware(['web', 'auth'])->prefix('admin/pickups')->group(function () {
     Route::post('/optimize-route', [RouteOptimizationController::class, 'optimizeFromLocation'])
         ->name('pickups.optimize-route');
-    
-    Route::get('/pending', [RouteOptimizationController::class, 'getPendingPickups'])
-        ->name('pickups.pending');
-    
+
+    Route::get('/pickups', [RouteOptimizationController::class, 'getPickups'])
+        ->name('pickups.get');
+
     Route::post('/calculate-distance', [RouteOptimizationController::class, 'calculateDistance'])
         ->name('pickups.calculate-distance');
 });

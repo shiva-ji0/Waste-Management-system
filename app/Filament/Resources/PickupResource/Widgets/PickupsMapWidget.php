@@ -9,23 +9,26 @@ use Filament\Widgets\Widget;
 class PickupsMapWidget extends Widget
 {
     protected static string $view = 'filament.resources.pickup-resource.widgets.pickups-map-widget';
-    
+
     protected int | string | array $columnSpan = 'full';
-    
+
     protected static ?int $sort = -1;
-    
+
     protected static bool $isLazy = false;
-    
+
     public static function canView(): bool
     {
         return true;
     }
 
+    /**
+     * Get only accepted and re-scheduled pickups (NO PENDING!)
+     */
     public function getPickups()
     {
         return Waste::whereNotNull('latitude')
             ->whereNotNull('longitude')
-            ->where('status', 'pending') // Only show pending pickups for route optimization
+            ->whereIn('status', ['accepted', 're-scheduled']) // ONLY accepted and re-scheduled
             ->with('user')
             ->get()
             ->map(function ($waste) {
@@ -46,17 +49,13 @@ class PickupsMapWidget extends Widget
     public function getOptimizedRoute()
     {
         $pickups = $this->getPickups();
-        
+
         if (count($pickups) < 2) {
             return null;
         }
 
         $optimizer = new RouteOptimizerService();
-        
-        // You can set a starting point (e.g., depot location)
-        // $startPoint = [27.7172, 85.3240]; // Kathmandu center
-        // return $optimizer->getOptimizedRoute($pickups, $startPoint);
-        
+
         return $optimizer->getOptimizedRoute($pickups);
     }
 }

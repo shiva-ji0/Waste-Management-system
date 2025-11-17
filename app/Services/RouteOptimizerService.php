@@ -24,7 +24,7 @@ class RouteOptimizerService
     /**
      * Optimize route using Nearest Neighbor Algorithm (Greedy Approach)
      * Always go to the closest unvisited location next
-     * 
+     *
      * @param array $pickups Array of pickups with latitude and longitude
      * @param array|null $startPoint Starting point [lat, lon], uses first pickup if null
      * @return array ['route' => ordered points, 'totalDistance' => float, 'directions' => array]
@@ -32,7 +32,7 @@ class RouteOptimizerService
     public function optimizeRouteNearestNeighbor(array $pickups, ?array $startPoint = null): array
     {
         $n = count($pickups);
-        
+
         if ($n === 0) {
             return ['route' => [], 'totalDistance' => 0, 'directions' => [], 'estimatedTime' => '0 minutes'];
         }
@@ -45,7 +45,7 @@ class RouteOptimizerService
                     $pickups[0]['latitude'], $pickups[0]['longitude']
                 );
             }
-            
+
             return [
                 'route' => $startPoint ? [
                     [
@@ -152,7 +152,7 @@ class RouteOptimizerService
     public function buildMinimumSpanningTree(array $pickups, ?array $startPoint = null): array
     {
         $n = count($pickups);
-        
+
         if ($n === 0) {
             return ['mst' => [], 'totalDistance' => 0, 'route' => []];
         }
@@ -204,9 +204,9 @@ class RouteOptimizerService
 
         for ($count = 0; $count < $n - 1; $count++) {
             $u = $this->findMinimumKey($key, $visited);
-            
+
             if ($u === -1) break;
-            
+
             $visited[$u] = true;
 
             for ($v = 0; $v < $n; $v++) {
@@ -274,7 +274,7 @@ class RouteOptimizerService
         foreach ($mst as $edge) {
             $fromIndex = array_search($edge['from'], $pickups);
             $toIndex = array_search($edge['to'], $pickups);
-            
+
             $graph[$fromIndex][] = $toIndex;
             $graph[$toIndex][] = $fromIndex;
         }
@@ -313,10 +313,10 @@ class RouteOptimizerService
 
         $y = sin($lonDiff) * cos($lat2);
         $x = cos($lat1) * sin($lat2) - sin($lat1) * cos($lat2) * cos($lonDiff);
-        
+
         $bearing = atan2($y, $x);
         $bearing = rad2deg($bearing);
-        
+
         return fmod($bearing + 360, 360);
     }
 
@@ -338,7 +338,7 @@ class RouteOptimizerService
         $averageSpeed = 30; // km/h
         $hours = $distanceKm / $averageSpeed;
         $minutes = round($hours * 60);
-        
+
         if ($minutes < 60) {
             return $minutes . ' minutes';
         } else {
@@ -370,8 +370,8 @@ class RouteOptimizerService
                 'total_distance' => $mst['totalDistance'],
                 'route' => $mst['route']
             ],
-            'recommendation' => $nearestNeighbor['totalDistance'] <= $mst['totalDistance'] 
-                ? 'nearest_neighbor' 
+            'recommendation' => $nearestNeighbor['totalDistance'] <= $mst['totalDistance']
+                ? 'nearest_neighbor'
                 : 'minimum_spanning_tree'
         ];
     }

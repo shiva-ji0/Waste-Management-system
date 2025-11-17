@@ -11,12 +11,11 @@
                 </div>
 
                 <div class="flex items-center gap-4">
-                    {{-- NEW: Button to show current location --}}
                     <button
                         id="show-my-location"
                         class="inline-flex items-center gap-2 px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white text-sm font-medium rounded-lg transition-colors duration-150 shadow-sm"
                     >
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
                         </svg>
@@ -52,7 +51,8 @@
                     <span>End Point</span>
                 </div>
                 <div class="ml-auto text-sm text-gray-600 dark:text-gray-400">
-                    Total Locations: <strong>{{ count($this->getPickups()) }}</strong>
+                    Ready for Pickup: <strong>{{ count($this->getPickups()) }}</strong>
+                    <span class="text-xs text-gray-500">(Accepted & Re-scheduled)</span>
                 </div>
             </div>
 
@@ -105,7 +105,7 @@
                 margin: 12px;
             }
             #optimize-from-location:disabled,
-            #show-my-location:disabled { /* Added the new button ID */
+            #show-my-location:disabled {
                 opacity: 0.6;
                 cursor: not-allowed;
             }
@@ -131,24 +131,43 @@
                 routeLayer = L.layerGroup().addTo(map);
                 markersLayer = L.layerGroup().addTo(map);
 
+                // Get only accepted and re-scheduled pickups
                 const pickups = @json($this->getPickups());
+
+                console.log('Loaded pickups:', pickups);
+                console.log('Total pickups count:', pickups.length);
 
                 if (pickups.length > 0) {
                     displayPickups(pickups);
+                } else {
+                    // Show message when no pickups are available
+                    const messageDiv = document.createElement('div');
+                    messageDiv.className = 'absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg text-center z-[1000]';
+                    messageDiv.innerHTML = `
+                        <svg class="w-16 h-16 mx-auto mb-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                        </svg>
+                        <p class="text-lg font-semibold mb-2">No Pickups Ready</p>
+                        <p class="text-sm text-gray-600 dark:text-gray-400">There are no accepted or re-scheduled pickups to display.</p>
+                        <p class="text-xs text-gray-500 dark:text-gray-500 mt-2">Pending pickups will appear here once they are accepted.</p>
+                    `;
+                    document.getElementById('pickups-map').appendChild(messageDiv);
                 }
 
                 // Event listeners
                 document.getElementById('optimize-from-location').addEventListener('click', function() {
+                    if (pickups.length === 0) {
+                        alert('No accepted or re-scheduled pickups available to optimize.');
+                        return;
+                    }
                     optimizeFromCurrentLocation();
                 });
 
-                // NEW: Event listener for the new button
                 document.getElementById('show-my-location').addEventListener('click', function() {
                     showMyLocation();
                 });
             });
 
-            // NEW: Reusable function to plot the current location marker
             function plotCurrentLocation(lat, lon) {
                 if (currentLocationMarker) {
                     map.removeLayer(currentLocationMarker);
@@ -185,10 +204,9 @@
                 }).addTo(map);
 
                 currentLocationMarker.bindPopup('<strong>Your Current Location</strong>').openPopup();
-                map.setView([lat, lon], 15); // Zoom in a bit more
+                map.setView([lat, lon], 15);
             }
 
-            // NEW: Dedicated function to show only the location
             function showMyLocation() {
                 const btn = document.getElementById('show-my-location');
                 const btnText = document.getElementById('location-btn-text');
@@ -208,7 +226,7 @@
                         const lat = position.coords.latitude;
                         const lon = position.coords.longitude;
 
-                        plotCurrentLocation(lat, lon); // Use the reusable plotting function
+                        plotCurrentLocation(lat, lon);
 
                         btnText.textContent = '✓ Location Shown!';
                         setTimeout(() => {
@@ -230,7 +248,6 @@
                 );
             }
 
-            // Refactored optimizeFromCurrentLocation to use plotCurrentLocation
             function optimizeFromCurrentLocation() {
                 const btn = document.getElementById('optimize-from-location');
                 const btnText = document.getElementById('optimize-btn-text');
@@ -250,7 +267,6 @@
                         const lat = position.coords.latitude;
                         const lon = position.coords.longitude;
 
-                        // Plot the location marker
                         plotCurrentLocation(lat, lon);
 
                         btnText.textContent = 'Optimizing route...';
@@ -268,6 +284,8 @@
                         })
                             .then(response => response.json())
                             .then(data => {
+                                console.log('Optimization response:', data);
+
                                 if (data.success && data.route) {
                                     displayRoute(data.route);
 
@@ -280,7 +298,7 @@
                                         btnText.textContent = 'Optimize Route from My Location';
                                     }, 3000);
                                 } else {
-                                    alert(data.message || 'Could not optimize route');
+                                    alert(data.message || 'Could not optimize route. No accepted or re-scheduled pickups found.');
                                     btnText.textContent = 'Optimize Route from My Location';
                                 }
                                 btn.disabled = false;
@@ -306,14 +324,15 @@
                 );
             }
 
-            // Remaining functions (displayPickups, displayRoute, displayDirections, createPickupPopup, getWasteTypeIcon, createCustomIcon, createNumberedIcon) are unchanged...
-
             function displayPickups(pickups) {
                 markersLayer.clearLayers();
 
                 pickups.forEach((pickup, index) => {
+                    // Use different colors based on status
+                    const statusColor = pickup.status === 're-scheduled' ? '#f59e0b' : '#3b82f6';
+
                     const marker = L.marker([pickup.latitude, pickup.longitude], {
-                        icon: createCustomIcon('pending', pickup.waste_type)
+                        icon: createCustomIcon(pickup.status, pickup.waste_type, statusColor)
                     }).addTo(markersLayer);
 
                     marker.bindPopup(createPickupPopup(pickup, index + 1, 0));
@@ -431,22 +450,24 @@
             }
 
             function createPickupPopup(point, step, distance) {
-                const isStart = step === 1;
-                const statusColor = isStart ? '#22c55e' : '#3b82f6';
+                const isStart = point.id === 'start';
+                const statusColor = isStart ? '#22c55e' : (point.status === 're-scheduled' ? '#f59e0b' : '#3b82f6');
+                const statusLabel = isStart ? 'START' : (point.status === 're-scheduled' ? 'RE-SCHEDULED' : 'ACCEPTED');
 
                 return `
                 <div style="min-width: 220px;">
                     <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
                         <h3 style="font-weight: 600; margin: 0;">Stop #${step}</h3>
                         <span style="background: ${statusColor}; color: white; padding: 2px 8px; border-radius: 12px; font-size: 11px;">
-                            ${isStart ? 'START' : 'PICKUP'}
+                            ${statusLabel}
                         </span>
                     </div>
-                    ${point.id !== 'start' && point.user_name ? `
+                    ${!isStart && point.user_name ? `
                     <div style="font-size: 13px;">
                         <div><strong>Type:</strong> ${point.waste_type}</div>
                         <div><strong>User:</strong> ${point.user_name}</div>
                         <div><strong>Weight:</strong> ${point.weight} kg</div>
+                        <div><strong>Status:</strong> ${point.status}</div>
                         ${distance > 0 ? `<div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #e5e7eb;"><strong>Distance:</strong> ${distance} km</div>` : ''}
                     </div>
                     ` : '<p>Your current location</p>'}
@@ -465,8 +486,7 @@
                 return icons[wasteType] || '📦';
             }
 
-            function createCustomIcon(status, wasteType) {
-                const color = '#eab308';
+            function createCustomIcon(status, wasteType, color = '#3b82f6') {
                 const icon = getWasteTypeIcon(wasteType);
 
                 return L.divIcon({
