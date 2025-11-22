@@ -26,6 +26,7 @@ class DriverPanelProvider extends PanelProvider
             ->id('driver')
             ->path('driver')
             ->login()
+            ->authGuard('driver')
             ->colors([
                 'primary' => Color::Amber,
             ])
