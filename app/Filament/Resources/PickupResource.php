@@ -167,7 +167,7 @@ class PickupResource extends Resource
                         'pending' => 'warning',
                         'accepted' => 'info',
                         're-scheduled' => 'purple',
-                        'collected' => 'success',
+//                        'collected' => 'success',
                         'completed' => 'success',
                         'cancelled' => 'danger',
                         default => 'gray',

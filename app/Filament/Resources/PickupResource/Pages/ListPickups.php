@@ -17,7 +17,14 @@ class ListPickups extends ListRecords
         ];
     }
 
+    // Remove the widget from header
     protected function getHeaderWidgets(): array
+    {
+        return [];
+    }
+
+    // Add the widget to footer (below the table)
+    protected function getFooterWidgets(): array
     {
         return [
             PickupResource\Widgets\PickupsMapWidget::class

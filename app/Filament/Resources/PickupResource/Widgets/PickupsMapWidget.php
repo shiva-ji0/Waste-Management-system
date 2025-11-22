@@ -12,7 +12,8 @@ class PickupsMapWidget extends Widget
 
     protected int | string | array $columnSpan = 'full';
 
-    protected static ?int $sort = -1;
+    // Change this from -1 to a positive number to move it below the table
+    protected static ?int $sort = 10;
 
     protected static bool $isLazy = false;
 

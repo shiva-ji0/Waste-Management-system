@@ -117,6 +117,7 @@ class WasteResource extends Resource
                         'rejected' => 'danger',
                         'pending' => 'warning',
                         're-scheduled' => 'info',
+                        'completed' =>'turquoise'
                     }),
 
                 Tables\Columns\TextColumn::make('latitude')
