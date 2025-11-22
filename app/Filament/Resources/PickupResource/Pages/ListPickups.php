@@ -27,7 +27,7 @@ class ListPickups extends ListRecords
     protected function getFooterWidgets(): array
     {
         return [
-            PickupResource\Widgets\PickupsMapWidget::class
+//            PickupResource\Widgets\PickupsMapWidget::class
         ];
     }
 

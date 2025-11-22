@@ -3,6 +3,7 @@
 namespace App\Filament\Driver\Resources\PickupResource\Pages;
 
 use App\Filament\Driver\Resources\PickupResource;
+use App\Models\Waste;
 use Filament\Actions;
 use Filament\Resources\Pages\ListRecords;
 
@@ -36,7 +37,7 @@ class ListPickups extends ListRecords
      */
     public function getPickups(): array
     {
-        return \App\Models\Waste::query()
+        return Waste::query()
             ->whereIn('status', ['accepted', 're-scheduled'])
             ->whereNotNull('latitude')
             ->whereNotNull('longitude')

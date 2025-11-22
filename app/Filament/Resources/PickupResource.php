@@ -112,9 +112,7 @@ class PickupResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
-            /**
-             * HIDE ALL PENDING PICKUPS
-             */
+
             ->modifyQueryUsing(fn ($query) => $query->where('status', '!=', 'pending'))
 
             ->columns([
@@ -217,29 +215,29 @@ class PickupResource extends Resource
                             ->when($data['until'], fn ($q) => $q->whereDate('date', '<=', $data['until']));
                     }),
             ])
-            ->actions([
-                Tables\Actions\ViewAction::make(),
-                Tables\Actions\EditAction::make(),
-                Tables\Actions\DeleteAction::make(),
-
-                Tables\Actions\Action::make('markAsCompleted')
-                    ->label('Mark Completed')
-                    ->icon('heroicon-o-check-circle')
-                    ->color('success')
-                    ->requiresConfirmation()
-                    ->action(function ($record) {
-                        $record->update(['status' => 'completed']);
-                    })
-                    ->visible(fn ($record) =>
-                    in_array($record->status, ['accepted', 're-scheduled', 'collected'])
-                    )
-                    ->successNotification(
-                        \Filament\Notifications\Notification::make()
-                            ->success()
-                            ->title('Pickup Completed')
-                            ->body('The pickup has been marked as completed.')
-                    ),
-            ])
+//            ->actions([
+//                Tables\Actions\ViewAction::make(),
+//                Tables\Actions\EditAction::make(),
+//                Tables\Actions\DeleteAction::make(),
+//
+//                Tables\Actions\Action::make('markAsCompleted')
+//                    ->label('Mark Completed')
+//                    ->icon('heroicon-o-check-circle')
+//                    ->color('success')
+//                    ->requiresConfirmation()
+//                    ->action(function ($record) {
+//                        $record->update(['status' => 'completed']);
+//                    })
+//                    ->visible(fn ($record) =>
+//                    in_array($record->status, ['accepted', 're-scheduled', 'collected'])
+//                    )
+//                    ->successNotification(
+//                        \Filament\Notifications\Notification::make()
+//                            ->success()
+//                            ->title('Pickup Completed')
+//                            ->body('The pickup has been marked as completed.')
+//                    ),
+//            ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make(),
@@ -281,7 +279,7 @@ class PickupResource extends Resource
     {
         return [
             'index' => Pages\ListPickups::route('/'),
-            'create' => Pages\CreatePickup::route('/create'),
+//            'create' => Pages\CreatePickup::route('/create'),
             'edit' => Pages\EditPickup::route('/{record}/edit'),
         ];
     }
