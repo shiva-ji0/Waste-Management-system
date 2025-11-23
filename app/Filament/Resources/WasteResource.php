@@ -1,8 +1,8 @@
 <?php
 
-namespace App\Filament\Admin\Resources;
+namespace App\Filament\Resources;
 
-use App\Filament\Admin\Resources\WasteResource\Pages;
+use App\Filament\Resources\WasteResource\Pages;
 use App\Models\Waste;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -14,10 +14,9 @@ use Filament\Notifications\Notification;
 class WasteResource extends Resource
 {
     protected static ?string $model = Waste::class;
-
     protected static ?string $navigationIcon = 'heroicon-o-trash';
-    protected static ?string $navigationLabel = 'Waste Pickups';
-    protected static ?string $pluralModelLabel = 'Waste Pickups';
+    protected static ?string $navigationLabel = 'Wastes';
+    protected static ?string $pluralModelLabel = 'Wastes';
 
     public static function form(Form $form): Form
     {
@@ -49,7 +48,8 @@ class WasteResource extends Resource
                     '9AM-12PM' => '9AM - 12 PM',
                     '12PM-3PM' => '12 PM - 3 PM',
                     '3PM-6PM' => '3 PM - 6 PM',
-                ]),
+                ])
+                ->required(),
 
             Forms\Components\TextInput::make('latitude')
                 ->numeric()
@@ -94,10 +94,8 @@ class WasteResource extends Resource
                         'gray'    => 'completed',
                     ]),
             ])
-
             ->actions([
                 Tables\Actions\EditAction::make(),
-
                 Tables\Actions\Action::make('changeStatus')
                     ->label('Change Status')
                     ->icon('heroicon-o-arrow-path')
@@ -110,13 +108,11 @@ class WasteResource extends Resource
                                 'accepted' => 'Accepted',
                                 'rejected' => 'Rejected',
                                 're-scheduled' => 'Re-scheduled',
-                                'completed' => 'Completed',
                             ])
                             ->required(),
                     ])
                     ->action(function ($record, $data) {
                         $record->update(['status' => $data['status']]);
-
                         Notification::make()
                             ->title('Status Updated')
                             ->success()
@@ -124,7 +120,6 @@ class WasteResource extends Resource
                             ->send();
                     }),
             ])
-
             ->bulkActions([
                 Tables\Actions\DeleteBulkAction::make(),
             ]);
@@ -139,3 +134,4 @@ class WasteResource extends Resource
         ];
     }
 }
+
