@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\RouteOptimizationController;
+
 use Illuminate\Support\Facades\Route;
 
 /*

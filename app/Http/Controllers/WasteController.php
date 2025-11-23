@@ -8,8 +8,14 @@ use Illuminate\Support\Facades\Validator;
 
 class WasteController extends Controller
 {
-public function store(Request $request)
-{ 
+    public function create()
+    {
+
+        return view('waste-form');
+    }
+
+    public function store(Request $request)
+{
     $validator = Validator::make($request->all(), [
         'waste_type' => 'required|in:recyclable,non-recyclable',
         'user_id' => 'required|exists:users,id',

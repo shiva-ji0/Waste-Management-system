@@ -3,8 +3,8 @@
 namespace App\Filament\Driver\Resources;
 
 use App\Filament\Driver\Resources\PickupResource\Pages;
-use App\Filament\Driver\Resources\PickupResource\RelationManagers;
-use App\Models\Pickup;
+
+
 use App\Models\Waste;
 use Dotswan\MapPicker\Fields\Map;
 use Filament\Forms;

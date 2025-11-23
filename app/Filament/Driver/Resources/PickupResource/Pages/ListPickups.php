@@ -9,7 +9,8 @@ use Filament\Resources\Pages\ListRecords;
 
 class ListPickups extends ListRecords
 {
-    protected static string $resource = \App\Filament\Resources\PickupResource::class;
+
+    protected static string $resource = \App\Filament\Driver\Resources\PickupResource::class;
 
     protected function getHeaderActions(): array
     {
@@ -18,13 +19,11 @@ class ListPickups extends ListRecords
         ];
     }
 
-    // Remove the widget from header
     protected function getHeaderWidgets(): array
     {
         return [];
     }
 
-    // Add the widget to footer (below the table)
     protected function getFooterWidgets(): array
     {
         return [
@@ -32,9 +31,6 @@ class ListPickups extends ListRecords
         ];
     }
 
-    /**
-     * Only accepted and re-scheduled pickups (NEVER pending)
-     */
     public function getPickups(): array
     {
         return Waste::query()
