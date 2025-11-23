@@ -77,6 +77,8 @@ class WasteResource extends Resource
 
     public static function table(Table $table): Table
     {
+        $validStatuses = ['pending', 'accepted', 'rejected', 're-scheduled', 'completed'];
+
         return $table
             ->columns([
                 Tables\Columns\TextColumn::make('id')->sortable(),
@@ -103,16 +105,20 @@ class WasteResource extends Resource
                     ->form([
                         Forms\Components\Select::make('status')
                             ->label('New Status')
-                            ->options([
-                                'pending' => 'Pending',
-                                'accepted' => 'Accepted',
-                                'rejected' => 'Rejected',
-                                're-scheduled' => 'Re-scheduled',
-                            ])
+                            ->options(array_combine($validStatuses, $validStatuses))
                             ->required(),
                     ])
-                    ->action(function ($record, $data) {
-                        $record->update(['status' => $data['status']]);
+                    ->action(function ($record, $data) use ($validStatuses) {
+                        $status = strtolower(trim($data['status']));
+                        if (!in_array($status, $validStatuses)) {
+                            Notification::make()
+                                ->title('Invalid Status')
+                                ->danger()
+                                ->body('The selected status is invalid.')
+                                ->send();
+                            return;
+                        }
+                        $record->update(['status' => $status]);
                         Notification::make()
                             ->title('Status Updated')
                             ->success()
@@ -124,6 +130,7 @@ class WasteResource extends Resource
                 Tables\Actions\DeleteBulkAction::make(),
             ]);
     }
+
 
     public static function getPages(): array
     {
